@@ -1,13 +1,13 @@
 {
-  "name": "arrray",
+  "name": "arrowy",
   "version": "1.0.0",
   "description": "Dependency-light, GitHub-backed and local file-backed database platform featuring Relational and Document engines with .arr chunk storage.",
-  "author": "Arrray Platform Contributors",
+  "author": "dwmk",
   "license": "MIT",
   "main": "./packages/core/src/index.js",
   "types": "./types/index.d.ts",
   "bin": {
-    "arrray": "./bin/array.js",
+    "arrowy": "./bin/array.js",
     "array": "./bin/array.js"
   },
   "exports": {

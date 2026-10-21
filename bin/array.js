@@ -12,19 +12,19 @@ import { parseCSV } from "../packages/import-export/src/csv-parser.js";
 import { serializeCSV } from "../packages/import-export/src/csv-serializer.js";
 
 const HELP_TEXT = `
-Array Database Platform CLI
+Arrowy Database Platform CLI
 
 Usage:
-  array init                          Initialize local .array directory & registry
-  array doctor                        Run connectivity and storage diagnostics
-  array db list                       List all registered databases
-  array db create <name> [--type <t>] Create a new database (type: relational | document)
-  array db drop <name>                Drop a database and its data
-  array table create <db> <table> <schema-file>  Create relational table with schema JSON
-  array collection create <db> <col>  Create a document collection
-  array import <db> <target> <file>   Import CSV or JSON data into table or collection
-  array export <db> <target> <out>    Export data to CSV, JSON, or JSONL
-  array integrity check               Run full integrity check on metadata & chunks
+  arrowy init                         Initialize local .array directory & registry
+  arrowy doctor                       Run connectivity and storage diagnostics
+  arrowy db list                      List all registered databases
+  arrowy db create <name> [--type <t>] Create a new database (type: relational | document)
+  arrowy db drop <name>               Drop a database and its data
+  arrowy table create <db> <table> <schema-file>  Create relational table with schema JSON
+  arrowy collection create <db> <col> Create a document collection
+  arrowy import <db> <target> <file>  Import CSV or JSON data into table or collection
+  arrowy export <db> <target> <out>   Export data to CSV, JSON, or JSONL
+  arrowy integrity check              Run full integrity check on metadata & chunks
 
 Environment variables:
   ARRAY_DATA_DIR        Local data directory (default: ./.array_data)

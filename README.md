@@ -1,4 +1,4 @@
-# Arrray Database Platform (`arrray`)
+# Arrowy Database Platform (`arrowy`)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D18.0.0-green.svg)](https://nodejs.org/)
@@ -11,12 +11,12 @@
 
 ## Table of Contents
 
-- [Why Arrray?](#why-arrray)
+- [Why Arrowy?](#why-arrowy)
 - [Key Features](#key-features)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
-  - [1. Arrray Relational (Schema-Enforced)](#1-arrray-relational-schema-enforced)
-  - [2. Arrray Document (Flexible JSON Store)](#2-arrray-document-flexible-json-store)
+  - [1. Arrowy Relational (Schema-Enforced)](#1-arrowy-relational-schema-enforced)
+  - [2. Arrowy Document (Flexible JSON Store)](#2-arrowy-document-flexible-json-store)
 - [TypeScript Support](#typescript-support)
 - [Storage Providers](#storage-providers)
   - [Local Provider (Offline / Development)](#local-provider-offline--development)
@@ -30,9 +30,9 @@
 
 ---
 
-## Why Arrray?
+## Why Arrowy?
 
-Traditional databases require dedicated servers, operational maintenance, or expensive proprietary SaaS tiers. Arrray provides a transparent alternative:
+Traditional databases require dedicated servers, operational maintenance, or expensive proprietary SaaS tiers. Arrowy provides a transparent alternative:
 
 - **Data is Stored in Clean Files:** Data records reside in versioned, byte-bounded `.arr` binary chunks containing SHA-256 verified JSON Lines.
 - **You Own Your Data:** Backed by your own GitHub repository or local disk. No hidden lock-in or proprietary storage partitions.
@@ -44,8 +44,8 @@ Traditional databases require dedicated servers, operational maintenance, or exp
 ## Key Features
 
 - **Dual-Engine Architecture:**
-  - **Arrray Relational:** Typed columns (`string`, `number`, `integer`, `boolean`, `date`, `json`, `id`), primary key enforcement, auto-increment IDs, fluent query builder, and point lookup range pruner.
-  - **Arrray Document:** Schema-flexible JSON store with dot-notation querying (`"specs.color"`), nested updates, and prototype-pollution protections.
+  - **Arrowy Relational:** Typed columns (`string`, `number`, `integer`, `boolean`, `date`, `json`, `id`), primary key enforcement, auto-increment IDs, fluent query builder, and point lookup range pruner.
+  - **Arrowy Document:** Schema-flexible JSON store with dot-notation querying (`"specs.color"`), nested updates, and prototype-pollution protections.
 - **`.arr` v1 Storage Objects:**
   - 8-byte magic identifier (`ARR1\0\0\0\0`).
   - uint32 Big-Endian format version and header length.
@@ -65,7 +65,7 @@ Traditional databases require dedicated servers, operational maintenance, or exp
   - Batch idempotency preventing duplicate row insertion on retries.
 - **Full Developer Studio & CLI:**
   - Responsive web dashboard for exploring data, editing rows, running queries, and checking integrity.
-  - Standalone CLI (`arrray` / `npx arrray`).
+  - Standalone CLI (`arrowy` / `npx arrowy`).
 
 ---
 
@@ -74,31 +74,31 @@ Traditional databases require dedicated servers, operational maintenance, or exp
 Install via npm:
 
 ```bash
-npm install arrray
+npm install arrowy
 ```
 
 Or using yarn / pnpm:
 
 ```bash
-yarn add arrray
+yarn add arrowy
 # or
-pnpm add arrray
+pnpm add arrowy
 ```
 
 To run the CLI directly without installing:
 
 ```bash
-npx arrray --help
+npx arrowy --help
 ```
 
 ---
 
 ## Quick Start
 
-### 1. Arrray Relational (Schema-Enforced)
+### 1. Arrowy Relational (Schema-Enforced)
 
 ```js
-import { ArrayDB } from "arrray";
+import { ArrayDB } from "arrowy";
 
 // Initialize with local file storage
 const db = new ArrayDB({ provider: "local" });
@@ -149,10 +149,10 @@ await employees.delete({ id: 2 });
 
 ---
 
-### 2. Arrray Document (Flexible JSON Store)
+### 2. Arrowy Document (Flexible JSON Store)
 
 ```js
-import { ArrayDB } from "arrray";
+import { ArrayDB } from "arrowy";
 
 const db = new ArrayDB({ provider: "local" });
 await db.initialize();
@@ -200,10 +200,10 @@ await products.deleteOne({ _id: inserted.insertedId });
 
 ## TypeScript Support
 
-`arrray` provides full first-class TypeScript declarations out of the box:
+`arrowy` provides full first-class TypeScript declarations out of the box:
 
 ```ts
-import { ArrayDB, TableSchemaDefinition, QueryResult } from "arrray";
+import { ArrayDB, TableSchemaDefinition, QueryResult } from "arrowy";
 
 interface Employee {
   id: number;
@@ -241,7 +241,7 @@ Stores all data in a remote GitHub repository branch using the Git Data API.
 const db = new ArrayDB({
   provider: "github",
   owner: "your-username",
-  repo: "my-arrray-datastore",
+  repo: "my-arrowy-datastore",
   branch: "main",
   token: process.env.ARRAY_GITHUB_TOKEN // Personal Access Token
 });
@@ -253,7 +253,7 @@ const db = new ArrayDB({
 
 ## Storage Object Format: `.arr` v1
 
-Arrray stores records in `.arr` binary container files:
+Arrowy stores records in `.arr` binary container files:
 
 ```text
 +-----------------------+----------------------+-----------------------+
@@ -269,55 +269,55 @@ Arrray stores records in `.arr` binary container files:
 +----------------------------------------------------------------------+
 ```
 
-Every chunk is independently verified using its SHA-256 checksum upon reading. If data tampering occurs, Arrray raises a `CorruptedDataError`.
+Every chunk is independently verified using its SHA-256 checksum upon reading. If data tampering occurs, Arrowy raises a `CorruptedDataError`.
 
 ---
 
 ## CLI Reference
 
-The package ships with the `arrray` executable:
+The package ships with the `arrowy` executable:
 
 ```bash
 # Initialize storage
-npx arrray init
+npx arrowy init
 
 # Run system health diagnostics
-npx arrray doctor
+npx arrowy doctor
 
 # Run deep integrity check on all chunk checksums & manifests
-npx arrray integrity check
+npx arrowy integrity check
 
 # List databases
-npx arrray db list
+npx arrowy db list
 
 # Create a database
-npx arrray db create company_db --type relational
-npx arrray db create ecom_store --type document
+npx arrowy db create company_db --type relational
+npx arrowy db create ecom_store --type document
 
 # Create a relational table
-npx arrray table create company_db employees ./schema.json
+npx arrowy table create company_db employees ./schema.json
 
 # Create a document collection
-npx arrray collection create ecom_store products
+npx arrowy collection create ecom_store products
 
 # Import CSV or JSON file
-npx arrray import company_db employees ./employees.csv
+npx arrowy import company_db employees ./employees.csv
 
 # Export data to CSV, JSON, or JSON Lines
-npx arrray export company_db employees ./backup.csv
-npx arrray export ecom_store products ./products.jsonl
+npx arrowy export company_db employees ./backup.csv
+npx arrowy export ecom_store products ./products.jsonl
 ```
 
 ---
 
 ## HTTP REST API
 
-Mount the Arrray HTTP router in Express or standalone Node.js:
+Mount the Arrowy HTTP router in Express or standalone Node.js:
 
 ```js
 import express from "express";
-import { createArrayRouter } from "arrray/http";
-import { ArrayDB } from "arrray";
+import { createArrayRouter } from "arrowy/http";
+import { ArrayDB } from "arrowy";
 
 const app = express();
 const db = new ArrayDB({ provider: "local" });
@@ -360,7 +360,7 @@ app.listen(3000);
 
 ## Testing & Integrity Auditing
 
-Arrray includes a comprehensive native test suite (`node:test`):
+Arrowy includes a comprehensive native test suite (`node:test`):
 
 ```bash
 npm test
@@ -379,4 +379,4 @@ All 19 tests across 6 test suites verify:
 
 ## License
 
-MIT © 2026 Arrray Contributors. See [LICENSE](./LICENSE) for details.
+MIT © 2026 Arrowy Contributors. See [LICENSE](./LICENSE) for details.

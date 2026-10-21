@@ -48,7 +48,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               []
             </div>
             <div>
-              <span className="font-semibold text-sm tracking-tight text-zinc-100 block">Arrray</span>
+              <span className="font-semibold text-sm tracking-tight text-zinc-100 block">Arrowy</span>
               <span className="text-[10px] text-zinc-500 font-mono tracking-wider uppercase block">Database Platform</span>
             </div>
           </div>
