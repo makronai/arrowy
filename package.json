@@ -1,5 +1,5 @@
 {
-  "name": "arrowy",
+  "name": "arrowydb",
   "version": "1.0.0",
   "description": "Dependency-light, GitHub-backed and local file-backed database platform featuring Relational and Document engines with .arr chunk storage.",
   "author": "dwmk",
