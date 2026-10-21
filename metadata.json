@@ -1,0 +1,6 @@
+{
+  "name": "Array Database Platform",
+  "description": "Developer-focused, dependency-light, GitHub-backed and local file-backed database platform featuring Relational and Document engines with .arr chunk storage.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

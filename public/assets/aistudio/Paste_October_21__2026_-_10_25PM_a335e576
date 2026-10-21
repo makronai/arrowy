@@ -1,0 +1,1309 @@
+# MASTER BUILD PROMPT: ARRAY
+
+## Build a Dependency-Light, GitHub-Backed Database Platform with JavaScript and Vercel
+
+You are a principal database engineer, JavaScript systems architect, distributed-systems engineer, security engineer, and product developer. Your task is to **design, implement, test, document, and prepare for deployment a working database platform called Array**.
+
+Do not stop at a technical proposal, directory structure, pseudocode, mockup, or proof-of-concept function. Work directly in the available project repository, create real files, implement the core functionality, run the tests, fix defects, and deliver the most complete working version that the environment allows.
+
+Make sensible engineering decisions independently. Do not ask me to approve every implementation choice. If a feature cannot be completed safely or reliably, explain the limitation and implement the best honest alternative.
+
+---
+
+# 1. Product Identity and Vision
+
+**Project name:** Array
+**Product category:** Developer-focused, file-backed database platform
+**Primary language:** Modern JavaScript using native platform APIs
+**Deployment target:** Vercel
+**Primary storage provider:** GitHub repositories and GitHub APIs
+**Dashboard:** Lightweight, responsive browser-based interface
+**Core philosophy:** Minimal dependencies, portable data, transparent storage, simple APIs, predictable limits, and developer ownership.
+
+Array should offer two data models through one cohesive developer experience:
+
+1. **Array Relational** — a schema-enforced, table-oriented database inspired by relational database concepts.
+2. **Array Document** — a flexible document database inspired by document stores such as MongoDB.
+
+The long-term objective is to provide a simple alternative for prototypes, personal applications, small projects, read-heavy datasets, configuration stores, data catalogs, and other workloads that benefit from versioned, file-based storage.
+
+Array must not claim to be PostgreSQL, MongoDB, Supabase, or a fully ACID-compliant database. It can support familiar concepts and selected query operations without claiming complete compatibility.
+
+## Non-negotiable principles
+
+- Use native JavaScript and platform APIs wherever practical.
+- Avoid mandatory third-party runtime dependencies in the core engine.
+- Keep the relational engine, document engine, storage provider, HTTP API, import/export system, and dashboard modular.
+- Make backend-only, dashboard-only, and combined deployments possible.
+- Never expose GitHub tokens or administrative credentials to browser code.
+- Never describe the platform as unconditionally free, infinitely scalable, or production-safe without evidence.
+- Prefer data integrity and recoverability over clever but fragile optimizations.
+- Deliver working code, not a collection of empty interfaces and TODO comments.
+
+---
+
+# 2. First Task: Inspect, Verify, and Plan
+
+Before implementing features:
+
+1. Inspect the existing repository, installed runtime, package manager, Node.js version, deployment configuration, and test setup.
+2. Preserve existing work that is useful.
+3. Verify the current GitHub REST and Git Data API behavior relevant to content reads, writes, commits, repository references, and rate limits.
+4. Verify current Vercel request-body restrictions, function runtimes, duration limits, and streaming capabilities.
+5. Verify the current availability of any proposed npm package names before preparing a release.
+6. Record important verified constraints in `docs/architecture-decisions.md`.
+
+Do not assume that a GitHub storage operation is transactional simply because an API request succeeds. Do not assume that Vercel can receive, buffer, or process an arbitrarily large import in one invocation.
+
+Create a short implementation checklist, then begin coding immediately.
+
+---
+
+# 3. Dependency Policy
+
+Array's core engine should have **zero mandatory third-party runtime dependencies**, wherever practical.
+
+Prefer native capabilities such as:
+
+- `fetch` for HTTP requests
+- `URL` and `URLSearchParams` for URL handling
+- `TextEncoder` and `TextDecoder` for text and byte handling
+- `Buffer` in compatible Node.js environments where appropriate
+- `node:crypto` for secure randomness, hashes, and cryptographic utilities
+- `node:stream` and Web Streams for streaming
+- `node:test` and `node:assert` for core tests
+- `node:fs`, `node:path`, and `node:os` for local development and filesystem operations
+- Native JavaScript objects, maps, sets, promises, and typed arrays
+
+The core must not require React, Vue, Express, Axios, Lodash, an ORM, or a third-party database driver.
+
+Development tools, type checkers, bundlers, and optional integrations may use development-only or explicitly optional dependencies if their benefits justify the additional complexity. Do not reinvent complex or security-sensitive machinery solely to claim zero dependencies.
+
+Maintain a dependency report containing:
+
+- Mandatory runtime dependencies
+- Optional dependencies
+- Development dependencies
+- Reasons for retaining each dependency
+- Approximate package footprint
+- Features that require optional packages
+
+Use ESM as the primary module format. Supply TypeScript declarations and validate them with type-checking tests. Support CommonJS only if it can be implemented and verified correctly.
+
+---
+
+# 4. Architecture: Multiple Engines, One Platform
+
+Use a modular architecture with clear contracts.
+
+Proposed repository layout:
+
+```text
+array/
+├── packages/
+│   ├── core/
+│   │   ├── src/
+│   │   │   ├── database.js
+│   │   │   ├── errors.js
+│   │   │   ├── validation.js
+│   │   │   ├── serialization.js
+│   │   │   ├── query/
+│   │   │   └── index.js
+│   │   └── test/
+│   ├── relational/
+│   │   └── src/
+│   ├── document/
+│   │   └── src/
+│   ├── storage/
+│   │   └── src/
+│   │       ├── provider.js
+│   │       ├── github.js
+│   │       ├── local.js
+│   │       ├── manifest.js
+│   │       ├── commits.js
+│   │       └── locks.js
+│   ├── format/
+│   │   └── src/
+│   │       ├── arr-v1.js
+│   │       ├── jsonl.js
+│   │       └── chunker.js
+│   ├── import-export/
+│   │   └── src/
+│   ├── http/
+│   │   └── src/
+│   ├── cli/
+│   │   └── src/
+│   └── dashboard/
+│       ├── public/
+│       └── src/
+├── examples/
+│   ├── backend-api/
+│   ├── relational-app/
+│   ├── document-app/
+│   └── full-stack/
+├── tests/
+│   ├── integration/
+│   ├── concurrency/
+│   ├── security/
+│   └── fixtures/
+├── docs/
+│   ├── architecture.md
+│   ├── architecture-decisions.md
+│   ├── storage-format.md
+│   ├── security.md
+│   ├── deployment.md
+│   ├── import-export.md
+│   ├── limitations.md
+│   └── api-reference.md
+├── package.json
+├── README.md
+├── LICENSE
+└── .gitignore
+```
+
+Adapt this structure to the existing repository if necessary, but preserve modular boundaries. Do not split every trivial helper into a separate package merely to increase the package count.
+
+The main public API should remain small and intuitive.
+
+Example API:
+
+```js
+import { ArrayDB } from "array";
+
+const db = new ArrayDB({
+  provider: "github",
+  owner: process.env.ARRAY_GITHUB_OWNER,
+  repo: process.env.ARRAY_GITHUB_REPO,
+  branch: "main",
+  token: process.env.ARRAY_GITHUB_TOKEN
+});
+
+const employees = db.relational("company_db").table("employees");
+
+const staff = await employees
+  .select(["id", "name", "department"])
+  .where("department", "=", "Sales")
+  .limit(50)
+  .execute();
+
+const products = db.document("ecom_store").collection("products");
+
+await products.insertOne({
+  name: "Keyboard",
+  specs: { color: "Red", layout: "US" }
+});
+
+const redProducts = await products.find({
+  "specs.color": "Red"
+});
+```
+
+This is a desired interface, not permission to fake features. Implement every exposed method, or explicitly mark it experimental and exclude it from the stable public API.
+
+---
+
+# 5. GitHub as a Storage Provider
+
+GitHub stores versioned repository content. It is not a purpose-built database. Array must account for API latency, rate limits, commit history growth, concurrent writes, repository growth, and the absence of general-purpose database transactions.
+
+Implement GitHub storage behind a provider interface, not throughout the query engine.
+
+A provider should define methods conceptually similar to:
+
+```js
+{
+  initialize(),
+  readFile(path, options),
+  readManifest(),
+  listFiles(path),
+  createCommit(changes, options),
+  getHead(),
+  checkHealth(),
+  getCapabilities()
+}
+```
+
+Design exact method signatures and error behavior before depending on them throughout the application.
+
+## 5.1 Credentials and permissions
+
+Support private repositories when the configured GitHub credentials and repository permissions allow them.
+
+Use environment variables for credentials. Document the minimum permissions needed for the selected authentication method. Never hard-code a token or include one in browser bundles, logs, error messages, generated files, URLs, or public examples.
+
+Include:
+
+- Configuration validation
+- Request timeouts
+- Safe retries for retryable errors
+- Rate-limit awareness
+- Exponential backoff with jitter where appropriate
+- Respect for API-provided retry instructions
+- Clear distinction between authentication, authorization, validation, conflict, throttling, and server errors
+- Request IDs and redacted diagnostic logs
+
+Do not blindly retry writes. A timed-out write may already have succeeded.
+
+## 5.2 Storage interface and local provider
+
+Implement a local provider for development and deterministic testing. It should use a temporary directory or explicitly configured data directory outside the source tree where practical.
+
+Both providers must follow the same storage contract.
+
+The local provider enables tests to run without a GitHub token or network connection. Unit tests for the core engine should not depend on GitHub availability.
+
+## 5.3 Git history and workload suitability
+
+New commits can increase repository history even when earlier files are replaced or deleted. Document this behavior prominently.
+
+Treat GitHub storage as most suitable initially for low-write workloads, controlled write concurrency, prototypes, and modest datasets.
+
+Build a configurable storage-provider interface so that a different implementation can later use a transactional database or object storage without rewriting the query API.
+
+Do not advertise strong multi-writer guarantees unless they have been demonstrated under concurrency tests.
+
+---
+
+# 6. Directory and Metadata Architecture
+
+Keep the original two-engine directory concept, adding manifests and partitioned indexes where necessary.
+
+```text
+repository-root/
+└── .array/
+    ├── config.json
+    ├── registries.json
+    ├── migrations/
+    └── operations/
+        └── import-jobs/
+
+    ├── relational_dbs/
+    │   └── company_db/
+    │       └── employees/
+    │           ├── schema.json
+    │           ├── metadata.json
+    │           ├── chunks/
+    │           │   ├── data_chunk_000001.arr
+    │           │   └── data_chunk_000002.arr
+    │           └── indexes/
+    │               ├── primary/
+    │               └── department/
+    │
+    └── nosql_dbs/
+        └── ecom_store/
+            └── products/
+                ├── metadata.json
+                ├── chunks/
+                ├── indexes/
+                └── tombstones/
+```
+
+Finalize the precise layout in `docs/storage-format.md`.
+
+Use consistent path rules, schema validation, escaping, and path traversal protections. Never directly interpolate an unvalidated database name, table name, or collection name into a repository path.
+
+Avoid giant central metadata files. Partition metadata and indexes as needed so that individual reads do not require retrieving every database's metadata.
+
+## 6.1 Registry format
+
+The registry identifies databases, tables, collections, provider configuration identifiers, format versions, and registered schema or index definitions.
+
+Do not put repository secrets in the registry.
+
+## 6.2 Table schema
+
+A table schema should support:
+
+- Column names and supported types
+- Required versus optional fields
+- Primary keys
+- Supported unique constraints
+- Default values
+- Nullable values
+- Basic validation constraints
+- Schema version
+- Creation and modification metadata
+
+Use an explicit supported type system, for example: `string`, `number`, `integer`, `boolean`, `date`, `json`, and `id`.
+
+Reject unknown columns and invalid values with structured errors. Clearly define whether schema changes are backward-compatible.
+
+Do not silently claim to enforce constraints that the implementation does not actually check.
+
+## 6.3 Metadata format
+
+Use a versioned metadata schema. An example:
+
+```json
+{
+  "format_version": 1,
+  "database_type": "relational",
+  "database": "company_db",
+  "name": "employees",
+  "total_records": 154200,
+  "next_auto_increment_id": 154201,
+  "generation": 17,
+  "chunks": [
+    {
+      "id": "chunk_000001",
+      "path": "chunks/data_chunk_000001.arr",
+      "record_count": 75000,
+      "size_bytes": 780000,
+      "sha256": "example-checksum",
+      "min_id": 1,
+      "max_id": 75000
+    }
+  ],
+  "indexes": [
+    {
+      "name": "primary",
+      "type": "hash",
+      "field": "id",
+      "version": 1
+    }
+  ]
+}
+```
+
+The values are illustrative. Actual chunk sizes must obey the configured size budget.
+
+Do not rely on a single permanent `index_map` in metadata for every record. A table containing millions of records could otherwise require an enormous metadata file. Use separate, versioned, partitioned index files.
+
+Keep record counts, byte counts, generation numbers, checksums, and index definitions internally consistent. Provide an integrity-check command that can compare metadata to actual data.
+
+Avoid numeric ID range scans as a universal routing mechanism: many document IDs are arbitrary strings, and IDs in mutable datasets may not remain ordered.
+
+---
+
+# 7. Relational Engine
+
+Implement a practical, explicitly limited relational layer.
+
+## 7.1 Required operations
+
+- Create and drop a database where permitted
+- Create and drop a table
+- Inspect table schema
+- Insert one row or multiple rows
+- Select requested columns
+- Filter rows
+- Update matching rows
+- Delete matching rows
+- Count matching rows
+- Sort results
+- Limit and paginate results
+- Retrieve a row by primary key
+- Validate unique and required fields
+- Generate automatic numeric IDs where configured
+- Export table contents
+
+Example:
+
+```js
+const result = await employees
+  .select(["id", "name", "department"])
+  .where("department", "=", "Sales")
+  .orderBy("name", "asc")
+  .limit(100)
+  .execute();
+```
+
+Support a documented set of conditions such as `=`, `!=`, `>`, `>=`, `<`, `<=`, `in`, `notIn`, `isNull`, and `contains`, with clearly defined type and null semantics.
+
+## 7.2 SQL support
+
+Do not claim PostgreSQL compatibility.
+
+First implement a safe, structured query builder. Only add a SQL-like interface if it can be parsed into a restricted abstract syntax tree.
+
+A SQL subset may include basic `SELECT`, `INSERT`, `UPDATE`, and `DELETE` statements, but only if the supported grammar is documented and tested.
+
+Never use `eval`, `new Function`, dynamically evaluated JavaScript, or string interpolation to execute queries.
+
+If a SQL interface accepts user values, support parameterized values. Validate all table names, columns, operators, and identifiers against registered schemas.
+
+Reject unsupported syntax with informative errors rather than silently returning incorrect results.
+
+## 7.3 Query execution
+
+Use primary-key and secondary indexes when valid and available. Otherwise perform bounded chunk scans.
+
+Track metrics such as:
+
+- Chunks examined
+- Records scanned
+- Index used
+- Result count
+- Execution duration
+- Cache hit or miss
+
+Avoid downloading all table chunks for every point lookup.
+
+Do not add an index implementation to the advertised feature set until writes, updates, deletes, and rebuilds keep it correct.
+
+---
+
+# 8. Document Engine
+
+Implement a schema-flexible JSON document engine.
+
+## 8.1 Required operations
+
+```js
+const products = db.document("ecom_store").collection("products");
+
+const inserted = await products.insertOne({
+  name: "Keyboard",
+  specs: { color: "Red", layout: "US" }
+});
+
+const found = await products.find({
+  "specs.color": "Red"
+});
+
+const product = await products.findOne({ _id: inserted.insertedId });
+
+await products.updateOne(
+  { _id: inserted.insertedId },
+  { $set: { "specs.layout": "UK" } }
+);
+
+await products.deleteOne({ _id: inserted.insertedId });
+```
+
+Implement and document:
+
+- `insertOne` and `insertMany`
+- `find` and `findOne`
+- `updateOne` and, if safely supported, `updateMany`
+- `deleteOne` and, if safely supported, `deleteMany`
+- `countDocuments`
+- `createIndex` and `dropIndex`, if index maintenance is implemented
+- Sorting, limits, and pagination
+
+Define a consistent ID field convention. Preserve user-provided IDs where appropriate, and generate unique IDs securely when necessary.
+
+## 8.2 Query operators
+
+Begin with a limited, safe operator set:
+
+- `$eq`, `$ne`
+- `$gt`, `$gte`, `$lt`, `$lte`
+- `$in`, `$nin`
+- `$exists`
+- `$and`, `$or`
+- `$set`, `$unset`, `$inc`
+
+Nested field paths must support dot notation, including clearly defined behavior for missing values, `null`, arrays, and invalid path components.
+
+Do not evaluate expressions supplied by a document or query. Implement path traversal using ordinary property-access logic, with protections against prototype pollution and dangerous keys.
+
+Treat user-supplied JSON as untrusted input.
+
+---
+
+# 9. Storage Format and the `.arr` Engine
+
+Implement an optional, versioned Array data format. Do not introduce an undocumented custom format merely for branding.
+
+The format should include:
+
+- A recognizable magic signature
+- Explicit format version
+- Defined header length and encoding
+- Record count where known
+- Payload encoding identifier
+- Optional integrity checksum
+- Clearly specified record boundaries
+- Compatibility and migration rules
+
+A practical initial payload format is UTF-8 JSON Lines, with one complete JSON record per line. A compact binary header may precede the payload for `.arr` files.
+
+Example conceptual structure:
+
+```text
+[MAGIC]
+[VERSION]
+[HEADER_LENGTH]
+[HEADER_JSON]
+[RECORD_1_JSON]\n
+[RECORD_2_JSON]\n
+[RECORD_3_JSON]\n
+...
+```
+
+Finalize and document exact byte layouts, integer byte order, checksums, payload encodings, and error behavior before treating `.arr` as stable.
+
+Make formats readable and recoverable wherever possible. Support plain JSON or JSON Lines as an interchange format even if Array uses `.arr` internally.
+
+Never present an illustrative layout as a finished binary specification.
+
+## 9.1 Correct chunking
+
+Implement a byte-aware chunk writer.
+
+It must:
+
+1. Serialize a complete record before considering it for a chunk.
+2. Measure its encoded size with the actual UTF-8 byte length.
+3. Include delimiters and header overhead when calculating file size.
+4. Flush the current chunk before a new record would exceed the maximum.
+5. Never divide a record between data chunks in the finalized storage representation.
+6. Handle Unicode, escaped strings, nested structures, and large individual records.
+7. Reject a record that cannot fit within the configured maximum, using a descriptive error.
+8. Validate record counts and checksums when reading chunks.
+9. Detect truncated, malformed, or corrupted files.
+10. Support deterministic serialization where necessary for hashing and reproducible tests.
+
+Do not slice a UTF-8 string at arbitrary byte offsets and assume every resulting substring is valid JSON.
+
+Default to a conservative, configurable storage-object budget, targeting approximately 768 KiB per data object initially. This is a design target, not a universal API guarantee. Validate it with the selected GitHub write method and deployment configuration.
+
+Allow the storage provider to impose different safe limits, and reserve space for headers and metadata.
+
+Provide tests for boundaries just below, exactly at, and just above the configured limit.
+
+---
+
+# 10. Consistency, Concurrency, and Recovery
+
+This is a critical subsystem, not an optional enhancement.
+
+A Git commit can atomically record a set of repository changes, but that does not automatically make Array a transactional database. Concurrent requests may read stale metadata, conflict on the same files, or overwrite one another's logical changes.
+
+Design an explicit write protocol.
+
+## Required protections
+
+- Generate unique operation or transaction IDs.
+- Use versioned manifests and generation checks.
+- Detect stale metadata before attempting a write.
+- Prevent silent lost updates.
+- Serialize writes within a supported scope when necessary.
+- Keep data chunks immutable when practical.
+- Stage data and metadata coherently.
+- Use the Git Data API or another verified approach when grouped changes need to land in one commit.
+- Update the active manifest only through a documented commit protocol.
+- Make import batches idempotent where practical.
+- Detect ambiguous write outcomes after timeouts.
+- Provide recovery and integrity-check tooling.
+- Avoid orphaned data files where possible, and safely identify recoverable orphans.
+- Treat deletion and index maintenance as integrity-sensitive operations.
+
+Do not assume a read-then-write lock implemented only in an ordinary JSON file is atomic. Concurrent serverless instances may race.
+
+If the selected GitHub mechanism cannot guarantee the required coordination, implement a conservative single-writer or serialized-write model, surface conflicts, and document the restriction.
+
+Do not advertise ACID transactions, snapshot isolation, compare-and-swap guarantees, or multi-writer safety unless the implementation demonstrates those properties.
+
+Add deterministic concurrency tests using simulated competing writers and stale manifests.
+
+---
+
+# 11. GitHub API Integration
+
+Build a small, reusable native `fetch`-based GitHub client.
+
+Required behavior:
+
+- Configurable owner, repository, branch, and authentication method
+- Proper request headers and API version configuration
+- Safe URL and path construction
+- Bounded timeouts
+- Pagination when listing resources
+- Structured response parsing
+- Rate-limit and retry handling
+- Clear error types
+- Commit SHA and file SHA handling
+- Optimistic conflict detection
+- Safe batched operations where supported
+- Health diagnostics that do not disclose secrets
+
+Distinguish file-content retrieval from Git blob retrieval and Git tree/commit operations. Choose the appropriate APIs based on file size, number of changes, and verified operational limits.
+
+Do not assume that 24 MB requests work reliably simply because the hard file limit is 100 MB. Test realistic payload sizes against the exact API methods being used.
+
+Implement request concurrency limits. Never send an unbounded number of simultaneous writes. Do not assume that parallel calls are safe simply because the API accepts them individually.
+
+Document repository growth and cleanup consequences, including that deleting a file from the latest commit does not erase all previous versions from Git history.
+
+---
+
+# 12. Server API and Middleware
+
+Build a small HTTP API that can run locally and on the supported Vercel Node.js runtime without requiring Express.
+
+Use standard request and response abstractions where possible, and keep Vercel-specific adapters separate from the storage and query engines.
+
+Potential route structure:
+
+```text
+/api/health
+/api/registry
+/api/databases
+/api/databases/:database/tables
+/api/databases/:database/collections
+/api/query
+/api/records
+/api/import/init
+/api/import/chunk
+/api/import/status/:jobId
+/api/export
+/api/admin/integrity
+```
+
+Choose final paths deliberately and document the request and response schema for each endpoint.
+
+Required capabilities:
+
+- JSON parsing with size limits
+- Parameter and payload validation
+- Consistent response envelopes
+- Structured error responses
+- Authentication and authorization
+- Request IDs
+- Rate limiting appropriate to the deployment model
+- CORS configuration with explicit allowed origins
+- Health checks
+- Query and operation limits
+- Safe streaming where supported
+- Clear API versioning rules
+
+Implement a small composable middleware mechanism for authentication, validation, logging, error handling, and request limits.
+
+Do not mistake CORS for authentication.
+
+Do not expose a public unauthenticated API that can read or modify arbitrary private repository data.
+
+Implement an authentication model suitable for a first release. For a private dashboard, require a verified authenticated session before administrative operations. If a complete production identity solution cannot be implemented without an external service, provide a clearly marked development mode and a documented secure integration boundary instead of inventing authentication.
+
+Do not store user passwords in plaintext. Use established, secure authentication practices rather than ad hoc credential handling.
+
+---
+
+# 13. Large Import Pipeline
+
+Import and export are core Array features. Implement them in a way that respects the limits of each execution environment.
+
+## 13.1 Supported import formats
+
+Start with:
+
+- JSON
+- JSON Lines
+- CSV
+
+Define precisely whether JSON import accepts a single document, a top-level array, or both.
+
+## 13.2 CSV correctness
+
+Implement or select a documented CSV dialect. At minimum, handle:
+
+- Quoted values
+- Escaped quote characters
+- Commas inside quoted values
+- CRLF and LF line endings
+- UTF-8 and Unicode
+- Empty fields
+- Optional headers
+- Quoted fields containing line breaks
+- Invalid or incomplete records
+
+Do not split CSV data on every newline; quoted fields can contain newlines.
+
+## 13.3 Streaming and serverless limits
+
+A browser may select a 100 MB file, but that does not mean the browser can send the entire file to one Vercel Function.
+
+Implement a staged import workflow such as:
+
+1. Create an import job with an authenticated request.
+2. Inspect and validate the file format and destination schema.
+3. Parse incrementally in the browser or a suitable streaming-capable process.
+4. Assemble batches containing complete records and keep requests below a conservative payload limit.
+5. Upload batches with job IDs, sequence numbers, integrity hashes, and idempotency keys.
+6. Validate and stage data safely.
+7. Commit data and update metadata using the supported commit protocol.
+8. Expose job progress, row counts, errors, and resumability.
+9. Clean up temporary data according to a documented recovery policy.
+
+Account for the fact that a request may fail after its payload has arrived or after a storage operation has succeeded.
+
+The implementation must not require a 100 MB request body to pass through a single Vercel Function. It must not assume unlimited invocation time or guaranteed background execution.
+
+Where the GitHub write rate, execution time, request count, or repository size makes a web-based import impractical, provide an appropriate limit and an alternative such as a local CLI import command.
+
+Do not promise reliable imports of arbitrary file sizes on a free hosting plan.
+
+## 13.4 Resumability
+
+An interrupted import must not silently duplicate rows or expose a half-imported dataset as complete.
+
+Track at least:
+
+- Job ID
+- Source format
+- Target database and table or collection
+- Received batch sequence numbers
+- Per-batch checksum
+- Records processed
+- Records rejected
+- Current status
+- Last successfully committed generation
+- Error details with secrets redacted
+
+Test interruption, duplicate batch delivery, retry, malformed input, and finalization failures.
+
+---
+
+# 14. Export Engine
+
+Support export to JSON, JSON Lines, and CSV.
+
+Export must:
+
+- Read a consistent manifest generation where the storage architecture supports it.
+- Fetch only the chunks required by the operation.
+- Apply filters and pagination where appropriate.
+- Produce valid CSV escaping.
+- Handle commas, quotes, Unicode, and embedded newlines correctly.
+- Stream output where the runtime and HTTP adapter support it.
+- Avoid buffering the entire dataset unless a documented bound makes that safe.
+- Set safe content-type and content-disposition headers.
+- Avoid using untrusted filenames directly in HTTP headers.
+- Report storage and export errors clearly.
+
+Do not claim atomic snapshot exports if concurrent writes can change data during the operation and there is no snapshot mechanism.
+
+Offer an explicit export consistency mode or explain the exact consistency behavior.
+
+---
+
+# 15. Indexes and Query Performance
+
+Implement indexes incrementally and correctly.
+
+Initial priorities:
+
+1. Primary-key lookup
+2. Chunk manifest lookup
+3. One or more secondary indexes
+4. Partitioned index storage
+5. Index rebuild and verification commands
+
+Index entries must identify the correct chunk and, where necessary, a record offset or ID. Define how offsets are calculated for each supported format.
+
+Update index data safely during insert, update, and delete operations. Rebuild indexes from source records and compare them with existing index contents in the integrity-check tool.
+
+Provide a fallback scan when an index is unavailable or invalid, subject to configured resource limits.
+
+Do not claim that every query reads only one chunk. Explain when an index or predicate allows that optimization and when a scan is required.
+
+Avoid maintaining duplicate data structures that create correctness risks without a measurable performance benefit.
+
+---
+
+# 16. Dashboard
+
+Build a polished but lightweight dashboard using standard HTML, CSS, and JavaScript. Do not make a frontend framework mandatory for the first release.
+
+The dashboard should feel like a real developer tool rather than a static marketing page.
+
+## Required screens
+
+**Overview**
+
+- Connection and storage status
+- Database, table, and collection counts
+- Record counts where efficiently available
+- Recent operations
+- Warnings for storage, rate limits, and import jobs
+
+**Database explorer**
+
+- Switch between relational and document databases
+- Browse tables and collections
+- Inspect schemas and metadata
+- Browse records with pagination
+- Search using supported query operations
+- Inspect index information
+
+**Data editor**
+
+- View and edit records safely
+- Validate schema-enforced rows before writing
+- Display document JSON in an editor
+- Confirm destructive operations
+- Show conflicts and validation errors
+
+**Import wizard**
+
+- Select a file
+- Choose a database, table, or collection
+- Inspect columns and data types where applicable
+- Preview records
+- Show validation results
+- Start, pause where supported, resume, or cancel jobs
+- Show progress and rejected rows
+
+**Export wizard**
+
+- Choose a format
+- Select fields and filters where supported
+- Download exported data
+- Explain limits for very large exports
+
+**Settings**
+
+- Configure a storage provider using secure server-side settings
+- Check repository connectivity and permissions
+- View non-secret configuration
+- Run integrity diagnostics
+
+The interface must be responsive, keyboard-accessible, and reasonably accessible to screen readers. Use semantic HTML and clear focus states.
+
+Never place GitHub credentials in page source, `localStorage`, client environment variables, query parameters, or browser-visible configuration objects.
+
+If a setting requires a backend secret, store and read it server-side.
+
+---
+
+# 17. CLI and Developer Experience
+
+Implement a practical CLI, using a verified package name and a consistent command name.
+
+Desired commands include:
+
+```bash
+array init
+array dev
+array doctor
+array db list
+array db create company_db
+array table create company_db employees
+array collection create ecom_store products
+array import company_db employees ./employees.csv
+array export company_db employees ./employees.json
+array integrity check
+array index rebuild company_db employees
+```
+
+The final command syntax must match the actual implementation.
+
+Requirements:
+
+- Helpful `--help` output
+- Clear usage errors
+- Environment-variable configuration
+- A documented local development mode
+- An example project generator if time permits
+- Meaningful nonzero exit codes on failure
+- No accidental credential output
+- No silent destructive actions
+
+The CLI should use the same database, format, and storage APIs as the HTTP service. Do not build a separate, incompatible data path just to make the CLI work.
+
+Before selecting final npm package names, check availability and potential naming conflicts. Do not publish packages unless explicitly authorized.
+
+---
+
+# 18. Security Requirements
+
+Treat data, queries, repository paths, incoming files, and browser requests as untrusted.
+
+Implement and test:
+
+- Strict input validation
+- Authentication and authorization
+- Resource-level access checks
+- Path traversal protection
+- Prototype-pollution defenses
+- Request body limits
+- Query limits and scan budgets
+- Import file limits
+- CSV and JSON validation
+- Secret redaction
+- Safe error messages
+- Explicit CORS policy
+- HTTP security headers appropriate to the deployment
+- Rate limiting appropriate to the hosting environment
+- Protection against unrestricted collection scans
+- Protection against oversized records
+- Integrity checks for stored files
+- Safe handling of malformed or corrupted metadata
+
+Use cryptographically secure randomness for security-sensitive IDs and tokens.
+
+Never return internal stack traces or secrets to ordinary API clients.
+
+Never rely exclusively on in-memory rate limiting when multiple serverless instances can run concurrently. If the deployment lacks shared coordination, document that limit and choose a conservative alternative.
+
+Provide a security review document that separates implemented protections from recommendations still outstanding.
+
+---
+
+# 19. Observability and Diagnostics
+
+Implement a small structured logging system without a mandatory third-party logging dependency.
+
+Provide metrics or diagnostic summaries for:
+
+- Storage requests
+- Rate-limit responses
+- Read and write failures
+- Retries
+- Query duration
+- Chunks read and written
+- Import progress
+- Export progress
+- Manifest generations
+- Detected data corruption
+- Concurrency conflicts
+- Cache behavior, if caching exists
+
+Never log access tokens, secrets, private records by default, or raw uploaded files.
+
+Provide a `doctor` command and an administrative health endpoint. They should verify configuration, storage access, metadata consistency, and supported capabilities without modifying user data unexpectedly.
+
+---
+
+# 20. Caching
+
+Add caching only where it preserves documented consistency behavior.
+
+Reasonable candidates include:
+
+- Repository metadata
+- Table schemas
+- Registry manifests
+- Immutable chunk contents
+- Read-only indexes
+
+Immutable chunks may be cached by content hash. Mutable manifests need stronger invalidation rules.
+
+Do not treat a warm serverless instance as persistent shared storage. Serverless memory is an optimization, never the system of record.
+
+Document cache lifetime, invalidation behavior, and what happens after a write from another process.
+
+---
+
+# 21. Testing and Quality Gates
+
+Testing is mandatory. A project that merely starts locally is not complete.
+
+## Unit tests
+
+Test:
+
+- Serialization and deserialization
+- `.arr` header parsing
+- Unicode and byte accounting
+- Record-aware chunk boundaries
+- Schema validation
+- Query operators
+- Nested document paths
+- Index creation and updates
+- CSV quoting and parsing
+- JSON and JSON Lines parsing
+- Metadata validation
+- Commit request construction
+- Retry classification
+- Error normalization
+- Authentication checks
+
+## Integration tests
+
+Test the complete flow:
+
+1. Initialize a database.
+2. Create a relational table.
+3. Insert rows.
+4. Query rows by primary key and secondary field.
+5. Update and delete records.
+6. Create a document collection.
+7. Insert nested documents.
+8. Query using dot notation and supported operators.
+9. Build and rebuild indexes.
+10. Import CSV and JSON data.
+11. Export the resulting dataset.
+12. Reopen the database from storage.
+13. Verify data integrity.
+
+Run provider-independent integration tests through the local storage provider. Add a separate opt-in GitHub integration test suite that requires explicitly configured credentials and a disposable repository.
+
+## Adversarial and failure tests
+
+Include:
+
+- Invalid metadata
+- Corrupted chunks
+- Oversized records
+- Multibyte UTF-8 boundaries
+- Malformed JSON
+- CSV fields containing quotes, commas, and newlines
+- Duplicate IDs
+- Invalid types
+- Missing required columns
+- Invalid query operators
+- Malicious field paths
+- Path traversal attempts
+- Stale manifests
+- Two competing writers
+- API timeouts after writes
+- Rate-limit responses
+- Interrupted imports
+- Duplicate batch submissions
+- Failed finalization
+- Partial export failures
+
+## Performance tests
+
+Benchmark representative workloads against a clearly defined dataset:
+
+- Primary-key lookups
+- Indexed equality filters
+- Unindexed scans
+- Inserts
+- Updates
+- Deletes
+- Import throughput
+- Export throughput
+- Cold storage requests versus cached reads
+
+Report dataset sizes, number of iterations, runtime environment, warm-up strategy, and whether network calls are included.
+
+Do not invent performance results or claim superiority over PostgreSQL, MongoDB, or other mature systems without fair, reproducible benchmarks.
+
+---
+
+# 22. Documentation and Deployment
+
+Create a complete README that includes:
+
+- What Array is
+- What it is not
+- Architecture overview
+- Installation
+- Quick-start example
+- Relational example
+- Document database example
+- Local development
+- GitHub storage configuration
+- Vercel deployment
+- Dashboard setup
+- Import and export instructions
+- CLI usage
+- Security considerations
+- Storage limitations
+- Consistency guarantees
+- Troubleshooting
+- Current stability status
+
+Also provide:
+
+- `.env.example` containing placeholders only
+- `.gitignore`
+- A valid package manifest
+- Package exports
+- TypeScript declarations
+- Basic license file
+- CI configuration
+- Deployment instructions
+- API reference
+- Storage format specification
+- Migration and recovery instructions
+- A changelog or release notes for the initial version
+
+If the platform requires external setup—such as a repository, access token, domain, or Vercel project—provide exact instructions. Do not claim to have deployed the application unless the deployment has actually succeeded.
+
+---
+
+# 23. Implementation Phases
+
+Work through these phases in order. Each phase should leave the project in a runnable, testable state.
+
+### Phase 1 — Core storage and metadata
+
+Build:
+
+- Shared storage-provider contract
+- Local provider
+- GitHub HTTP client
+- Configuration validation
+- Registry and manifest models
+- Metadata serialization
+- Error model
+- Storage and metadata unit tests
+
+**Completion condition:** The local provider can initialize a database, save metadata, retrieve it, and detect corrupted metadata.
+
+### Phase 2 — Array format and chunking
+
+Build:
+
+- Versioned `.arr` format
+- JSON Lines support
+- Record-aware byte counter
+- Chunk writer and reader
+- Checksums
+- Configurable storage-object budget
+- Integrity verification
+
+**Completion condition:** Large generated datasets can be chunked and reconstructed with exact record equality, valid UTF-8, and correct checksums.
+
+### Phase 3 — Relational engine
+
+Build:
+
+- Schema definitions
+- Type validation
+- Table management
+- Insert, select, update, delete, and count
+- Conditions, sorting, and pagination
+- Primary-key lookup
+- Initial secondary index
+- Relational integration tests
+
+**Completion condition:** The test suite can exercise a complete relational CRUD lifecycle without GitHub credentials.
+
+### Phase 4 — Document engine
+
+Build:
+
+- Collection management
+- Document insertion and retrieval
+- Nested property queries
+- Updates and deletions
+- Supported query operators
+- Index integration
+- Document engine integration tests
+
+**Completion condition:** The full document CRUD lifecycle passes, including nested fields, invalid input, and index correctness.
+
+### Phase 5 — GitHub provider and consistency controls
+
+Build:
+
+- Real GitHub reads and writes
+- Commit and branch handling
+- Rate-limit awareness
+- Conflict detection
+- Write coordination or enforced single-writer behavior
+- Provider health checks
+- Opt-in integration tests
+- Recovery documentation
+
+**Completion condition:** The supported write model is explicitly documented and verified, and concurrent updates cannot silently overwrite one another in the tested scenarios.
+
+### Phase 6 — API and authentication
+
+Build:
+
+- HTTP routes
+- Middleware
+- Auth checks
+- Request validation
+- Error responses
+- Query limits
+- Health and diagnostics endpoints
+
+**Completion condition:** API tests verify both authorized operations and denied unauthorized operations.
+
+### Phase 7 — Import and export
+
+Build:
+
+- CSV parser
+- JSON and JSON Lines import
+- Staged and resumable import workflow
+- Batch validation and checksums
+- Export writers
+- Job status and failure recovery
+
+**Completion condition:** A large-file import can run incrementally under configured limits, resume after an interruption, and produce a dataset whose records and counts match expectations.
+
+### Phase 8 — Dashboard and CLI
+
+Build the database explorer, editors, import/export screens, secure settings interface, CLI, and examples.
+
+**Completion condition:** A developer can complete the main workflows through documented interfaces without manually editing repository metadata.
+
+### Phase 9 — Release preparation
+
+Perform:
+
+- Full test run
+- Security review
+- Dependency audit
+- Package export validation
+- Type declaration checks
+- Performance measurements
+- Fresh-install test
+- Documentation review
+- Deployment configuration validation
+
+Do not publish a package or deploy a public production instance without explicit authorization.
+
+---
+
+# 24. Definition of Done
+
+The first release is complete only when the following criteria have been met or transparently marked as incomplete:
+
+- [ ] Native JavaScript core with no mandatory third-party runtime dependencies.
+- [ ] Relational and document engines have separate, tested implementations.
+- [ ] Local storage provider works without external credentials.
+- [ ] GitHub provider implements the documented operations.
+- [ ] Data files use a documented, versioned format.
+- [ ] Chunking never splits records arbitrarily.
+- [ ] Metadata includes integrity and version information.
+- [ ] Point lookups can use primary-key indexes.
+- [ ] Supported query operators produce correct results.
+- [ ] CRUD tests pass for both engines.
+- [ ] Concurrency conflicts are detected or safely prevented within the declared model.
+- [ ] Large imports respect serverless body and execution limits.
+- [ ] Import retries do not silently duplicate records.
+- [ ] Exports generate valid JSON, JSON Lines, and CSV.
+- [ ] Dashboard credentials remain server-side.
+- [ ] API routes enforce authentication and authorization.
+- [ ] Error handling does not disclose secrets.
+- [ ] The CLI runs using the same engine.
+- [ ] Documentation explains consistency, cost, and storage limits.
+- [ ] All implemented tests have been run and their results reported.
+- [ ] The product does not claim features or guarantees that have not been verified.
+
+---
+
+# 25. Final Working Instructions
+
+Begin by examining the current repository. Then implement Array in the environment available to you.
+
+When choosing between architectural perfection and an actually working first release, prioritize a correct, small, testable implementation. Expand only after the foundations pass.
+
+Do not leave placeholder methods that return fake data. Do not swallow errors. Do not simulate GitHub writes in the production provider. Do not commit secrets. Do not add unnecessary dependencies. Do not fabricate benchmark results.
+
+If the full feature set cannot be completed in one implementation pass, finish the highest-priority end-to-end path first:
+
+1. Create a database.
+2. Create a table or collection.
+3. Insert and query real records.
+4. Persist records through the selected provider.
+5. Reopen and verify the data.
+6. Run a bulk import and export within explicitly enforced limits.
+7. Verify tests and document remaining limitations.
+
+Finish by providing a factual handoff containing:
+
+- What was implemented
+- Files and modules created
+- Exact commands used to run tests
+- Which tests passed and failed
+- How to start the application locally
+- How to configure GitHub storage
+- How to deploy to Vercel
+- Which features are stable, experimental, or incomplete
+- Current operational constraints
+- Known security and consistency limitations
+- The next three highest-value engineering tasks
+
+**The goal is not to make Array look like a database. The goal is to build an understandable, verifiable database platform whose actual behavior matches its documented guarantees.**
